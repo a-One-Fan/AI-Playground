@@ -438,13 +438,15 @@ def __callback_on_step_end__(
 # region generate_image_function
 
 
-def convet_compel_prompt(
-    prompt: str, pipe: StableDiffusionPipeline | StableDiffusionXLPipeline
+def convert_compel_prompt(
+    prompt: str, pipe: StableDiffusionPipeline | StableDiffusionXLPipeline, negative: bool = False
 ):
     custom_inputs = {}
+    prompt_name = "prompt" if not negative else "negative_prompt"
+    pooled_name = "pooled_prompt_embeds" if not negative else "negative_pooled_prompt_embeds"
 
     if hasattr(pipe, "text_encoder_2") and hasattr(pipe, "tokenizer_2"):
-        custom_inputs.update({"prompt": prompt})
+        custom_inputs.update({prompt_name: prompt})
         # compel_proc2 = Compel(
         #     tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
         #     text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
@@ -456,8 +458,8 @@ def convet_compel_prompt(
         # prompt_embeds, pooled_prompt_embeds = compel_proc2(pooled_prompt)
         # custom_inputs.update(
         #     {
-        #         "prompt_embeds": prompt_embeds,
-        #         "pooled_prompt_embeds": pooled_prompt_embeds,
+        #         prompt_name + "_embeds": prompt_embeds,
+        #         pooled_name: pooled_prompt_embeds,
         #     }
         # )
     else:
@@ -466,7 +468,7 @@ def convet_compel_prompt(
         prompt_embeds = compel_proc(compel_prompt)
         custom_inputs.update(
             {
-                "prompt_embeds": prompt_embeds,
+                prompt_name + "_embeds": prompt_embeds,
             }
         )
 
@@ -481,7 +483,8 @@ def text_to_image(
     set_components(pipe, params)
     pipe.to(model_config.device)
 
-    custom_inputs = convet_compel_prompt(params.prompt, pipe)
+    custom_inputs = convert_compel_prompt(params.prompt, pipe)
+    custom_inputs.update(convert_compel_prompt(params.negative_prompt, pipe, negative=True))
     seed = params.seed
 
     _generate_idx = 0
@@ -530,7 +533,8 @@ def image_to_image(params: ImageToImageParams):
     seed = params.seed
 
     _generate_idx = 0
-    custom_inputs = convet_compel_prompt(params.prompt, pipe)
+    custom_inputs = convert_compel_prompt(params.prompt, pipe)
+    custom_inputs.update(convert_compel_prompt(params.negative_prompt, pipe, negative=True))
     seed = params.seed
     with torch.inference_mode():
         while _generate_idx < params.generate_number:
@@ -550,7 +554,6 @@ def image_to_image(params: ImageToImageParams):
                 strength=params.denoise,
                 guidance_scale=params.guidance_scale,
                 num_inference_steps=params.inference_steps,
-                negative_prompt=params.negative_prompt,
                 callback_on_step_end=__callback_on_step_end__,
                 **custom_inputs,
             ).images[0]
@@ -584,7 +587,8 @@ def upscale(params: UpscaleImageParams):
         set_components(pipe, params)
         pipe.to(model_config.device)
 
-        custom_inputs = convet_compel_prompt(params.prompt, pipe)
+        custom_inputs = convert_compel_prompt(params.prompt, pipe)
+        custom_inputs.update(convert_compel_prompt(params.negative_prompt, pipe, negative=True))
         seed = params.seed
         _generate_idx = 0
         with torch.inference_mode():
@@ -604,7 +608,6 @@ def upscale(params: UpscaleImageParams):
                 strength=params.denoise,
                 guidance_scale=params.guidance_scale,
                 num_inference_steps=params.inference_steps,
-                negative_prompt=params.negative_prompt,
                 callback_on_step_end=__callback_on_step_end__,
                 **custom_inputs,
             ).images[0]
@@ -652,7 +655,8 @@ def inpaint(params: InpaintParams):
     seed = params.seed
     _generate_idx = 0
 
-    custom_inputs = convet_compel_prompt(params.prompt, pipe)
+    custom_inputs = convert_compel_prompt(params.prompt, pipe)
+    custom_inputs.update(convert_compel_prompt(params.negative_prompt, pipe, negative=True))
     with torch.inference_mode():
         while _generate_idx < params.generate_number:
             params.seed = (
@@ -673,7 +677,6 @@ def inpaint(params: InpaintParams):
                 generator=generator,
                 guidance_scale=params.guidance_scale,
                 num_inference_steps=params.inference_steps,
-                negative_prompt=params.negative_prompt,
                 callback_on_step_end=__callback_on_step_end__,
                 force_unmasked_unchanged=True,
             ).images[0]
@@ -740,7 +743,8 @@ def outpaint(params: OutpaintParams):
 
     seed = params.seed
     _generate_idx = 0
-    custom_inputs = convet_compel_prompt(params.prompt, pipe)
+    custom_inputs = convert_compel_prompt(params.prompt, pipe)
+    custom_inputs.update(convert_compel_prompt(params.negative_prompt, pipe, negative=True))
     with torch.inference_mode():
         while _generate_idx < params.generate_number:
             params.seed = (
@@ -760,7 +764,6 @@ def outpaint(params: OutpaintParams):
                 generator=generator,
                 guidance_scale=params.guidance_scale,
                 num_inference_steps=params.inference_steps,
-                negative_prompt=params.negative_prompt,
                 callback_on_step_end=__callback_on_step_end__,
                 force_unmasked_unchanged=True,
             ).images[0]
